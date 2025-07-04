@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SmarterGerman Analytics Dashboard</title>
+    <title>SmarterGerman Analytics Dashboard - Debug Version</title>
     <style>
         * {
             margin: 0;
@@ -24,7 +24,7 @@
         }
         
         .header {
-            background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
+            background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);
             color: white;
             padding: 30px;
             border-radius: 12px;
@@ -75,7 +75,7 @@
         }
         
         .connect-btn {
-            background: #ff6b35;
+            background: #dc3545;
             color: white;
             border: none;
             padding: 10px 20px;
@@ -87,7 +87,7 @@
         }
         
         .connect-btn:hover {
-            background: #e55a2b;
+            background: #c82333;
         }
         
         .connect-btn:disabled {
@@ -104,14 +104,27 @@
             margin-bottom: 20px;
         }
         
+        .debug-log {
+            background: #f1f3f4;
+            border: 1px solid #dadce0;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        
         .success-info {
             margin-top: 15px;
             padding: 15px;
-            background: #f0f9ff;
-            border: 1px solid #0ea5e9;
+            background: #fff3cd;
+            border: 1px solid #ffc107;
             border-radius: 8px;
             font-size: 14px;
-            color: #0369a1;
+            color: #856404;
         }
         
         .metrics-grid {
@@ -126,13 +139,13 @@
             padding: 25px;
             border-radius: 12px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            border-left: 4px solid #ff6b35;
+            border-left: 4px solid #dc3545;
         }
         
         .metric-value {
             font-size: 32px;
             font-weight: 700;
-            color: #ff6b35;
+            color: #dc3545;
             margin-bottom: 5px;
         }
         
@@ -158,16 +171,6 @@
             color: #6b7280;
         }
         
-        .debug-info {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 8px;
-            margin-top: 20px;
-            font-family: monospace;
-            font-size: 12px;
-            color: #666;
-        }
-        
         @media (max-width: 768px) {
             .api-form {
                 flex-direction: column;
@@ -190,8 +193,8 @@
     <div class="dashboard">
         <div class="header">
             <div>
-                <h1>SmarterGerman Analytics Dashboard</h1>
-                <p>Connect via WordPress proxy to access real-time Teachable data</p>
+                <h1>🔧 SmarterGerman Analytics Dashboard - DEBUG MODE</h1>
+                <p>Debug version with complete data loading and detailed logging</p>
             </div>
             <div id="connectionStatus" class="connection-status">
                 <span style="color: #fca5a5;">Not Connected</span>
@@ -214,16 +217,19 @@
                 </div>
                 <div class="form-group">
                     <label>&nbsp;</label>
-                    <button class="connect-btn" onclick="connectAPI()">Connect via WordPress</button>
+                    <button class="connect-btn" onclick="connectAPI()">Load Complete Data with Debug</button>
                 </div>
             </div>
             <div class="success-info">
-                <strong>🔒 Secure:</strong> API key sent to your WordPress proxy, never stored on GitHub Pages<br>
-                <strong>✅ Fixed:</strong> Corrected API base URL to developers.teachable.com
+                <strong>🔧 DEBUG MODE:</strong> This version prioritizes complete data over speed and shows detailed logs of all API calls.
             </div>
         </div>
         
         <div id="errorMessage" class="error" style="display: none;"></div>
+        
+        <div id="debugLog" class="debug-log" style="display: none;">
+            <strong>Debug Log:</strong><br>
+        </div>
         
         <div id="metricsGrid" class="metrics-grid" style="display: none;">
             <div class="metric-card">
@@ -251,14 +257,24 @@
 
     <script>
         let teachableAPI = null;
+        let debugLog = [];
+        
+        function addDebugLog(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            debugLog.push(`[${timestamp}] ${message}`);
+            const debugElement = document.getElementById('debugLog');
+            debugElement.innerHTML = '<strong>Debug Log:</strong><br>' + debugLog.join('<br>');
+            debugElement.style.display = 'block';
+            console.log(`[DEBUG] ${message}`);
+        }
         
         class TeachableAPI {
             constructor(apiKey, schoolDomain, proxyURL) {
                 this.apiKey = apiKey;
-                // KORRIGIERTE BASE URL - das war das Hauptproblem!
                 this.baseURL = 'https://developers.teachable.com/v1';
                 this.schoolDomain = schoolDomain;
                 this.proxyURL = proxyURL;
+                addDebugLog(`TeachableAPI initialized with proxy: ${proxyURL}`);
             }
             
             async request(endpoint, method = 'GET', data = null) {
@@ -272,8 +288,7 @@
                     requestData.data = data;
                 }
                 
-                console.log('Sending request to proxy:', this.proxyURL);
-                console.log('Request data:', { ...requestData, apiKey: '[HIDDEN]' });
+                addDebugLog(`Making request to: ${endpoint}`);
                 
                 try {
                     const response = await fetch(this.proxyURL, {
@@ -284,29 +299,47 @@
                         body: JSON.stringify(requestData)
                     });
                     
-                    console.log('Proxy Response Status:', response.status);
+                    addDebugLog(`Response status for ${endpoint}: ${response.status}`);
                     
                     if (!response.ok) {
                         const errorText = await response.text();
-                        console.log('Error response:', errorText);
+                        addDebugLog(`ERROR for ${endpoint}: ${response.status} - ${errorText.substring(0, 200)}`);
                         
                         if (response.status === 401) {
                             throw new Error('Invalid API key or unauthorized access');
                         } else if (response.status === 403) {
                             throw new Error('API access forbidden - check your Teachable plan (Pro+ required)');
                         } else if (response.status === 404) {
-                            throw new Error('API endpoint not found - check your API configuration');
+                            throw new Error(`API endpoint not found: ${endpoint}`);
                         } else {
                             throw new Error(`Proxy Error: ${response.status} - ${errorText.substring(0, 200)}`);
                         }
                     }
                     
                     const responseData = await response.json();
-                    console.log('API Response Data:', responseData);
+                    
+                    // Detaillierte Antwort-Analyse
+                    if (responseData.users && Array.isArray(responseData.users)) {
+                        addDebugLog(`Users endpoint returned: ${responseData.users.length} users`);
+                        if (responseData.meta) {
+                            addDebugLog(`Meta data: ${JSON.stringify(responseData.meta)}`);
+                        }
+                    } else if (responseData.enrollments && Array.isArray(responseData.enrollments)) {
+                        addDebugLog(`Enrollments endpoint returned: ${responseData.enrollments.length} enrollments`);
+                        if (responseData.meta) {
+                            addDebugLog(`Enrollment meta: ${JSON.stringify(responseData.meta)}`);
+                        }
+                    } else if (responseData.courses && Array.isArray(responseData.courses)) {
+                        addDebugLog(`Courses endpoint returned: ${responseData.courses.length} courses`);
+                    } else {
+                        addDebugLog(`Unexpected response structure for ${endpoint}: ${JSON.stringify(Object.keys(responseData))}`);
+                        addDebugLog(`First few chars of response: ${JSON.stringify(responseData).substring(0, 200)}`);
+                    }
+                    
                     return responseData;
                     
                 } catch (error) {
-                    console.error('API Request failed:', error);
+                    addDebugLog(`Request failed for ${endpoint}: ${error.message}`);
                     throw error;
                 }
             }
@@ -323,26 +356,14 @@
                 return this.request(`/enrollments?page=${page}&per_page=100`);
             }
             
-            async getUserProgress(userId) {
-                return this.request(`/users/${userId}/enrollments`);
-            }
-            
-            async getCourseProgress(courseId) {
-                return this.request(`/courses/${courseId}/progress`);
-            }
-            
-            async getCourseEnrollments(courseId, page = 1) {
-                return this.request(`/courses/${courseId}/enrollments?page=${page}&per_page=100`);
-            }
-            
             async testConnection() {
                 try {
-                    console.log('Testing connection...');
+                    addDebugLog('Testing connection with courses endpoint...');
                     const courses = await this.getCourses();
-                    console.log('Test connection result:', courses);
+                    addDebugLog('Connection test successful');
                     return courses && (courses.courses || courses);
                 } catch (error) {
-                    console.error('Connection test failed:', error);
+                    addDebugLog(`Connection test failed: ${error.message}`);
                     return false;
                 }
             }
@@ -358,21 +379,29 @@
                 return;
             }
             
+            // Reset debug log
+            debugLog = [];
+            document.getElementById('debugLog').style.display = 'none';
+            
             const connectBtn = document.querySelector('.connect-btn');
             connectBtn.disabled = true;
-            connectBtn.textContent = 'Connecting...';
+            connectBtn.textContent = 'Loading Complete Data...';
+            
+            addDebugLog('Starting complete data load process...');
             
             try {
                 teachableAPI = new TeachableAPI(apiKey, schoolDomain, proxyURL);
+                
+                // Test connection first
                 const coursesData = await teachableAPI.testConnection();
                 
                 if (coursesData) {
-                    document.getElementById('connectionStatus').innerHTML = '<span style="color: #10b981;">✓ Connected via WordPress</span>';
+                    document.getElementById('connectionStatus').innerHTML = '<span style="color: #10b981;">✓ Connected - Loading All Data</span>';
                     document.getElementById('metricsGrid').style.display = 'grid';
                     document.getElementById('mainContent').style.display = 'block';
                     hideError();
                     
-                    await loadDashboardData();
+                    await loadCompleteData();
                     
                     // Clear API key for security
                     document.getElementById('apiKey').value = '';
@@ -381,271 +410,230 @@
                     throw new Error('Failed to authenticate with Teachable API via proxy');
                 }
             } catch (error) {
+                addDebugLog(`Connection failed: ${error.message}`);
                 showError(`Connection failed: ${error.message}`);
                 document.getElementById('connectionStatus').innerHTML = '<span style="color: #ef4444;">Connection Failed</span>';
             }
             
             connectBtn.disabled = false;
-            connectBtn.textContent = 'Connect via WordPress';
+            connectBtn.textContent = 'Load Complete Data with Debug';
         }
         
-        async function loadDashboardData() {
+        async function loadCompleteData() {
             try {
-                console.log('Loading comprehensive dashboard data with parallel processing...');
+                addDebugLog('=== STARTING COMPLETE DATA LOAD ===');
                 
-                // 1. Kurse laden (parallel zu Users)
-                const coursesPromise = teachableAPI.getCourses();
-                
-                // 2. Intelligente parallele User-Loading mit Rate Limit Detection
-                console.log('Starting smart parallel user loading...');
-                let batchSize = 5; // Starte konservativ
-                let allUsers = [];
-                let currentBatch = 1;
-                let rateLimitDetected = false;
-                
-                while (true) {
-                    const batchPromises = [];
-                    const startPage = (currentBatch - 1) * batchSize + 1;
-                    const endPage = startPage + batchSize - 1;
-                    
-                    for (let page = startPage; page <= endPage; page++) {
-                        batchPromises.push(
-                            teachableAPI.getUsers(page).catch(error => {
-                                console.warn(`Page ${page} failed:`, error);
-                                if (error.message.includes('429') || error.message.includes('rate')) {
-                                    rateLimitDetected = true;
-                                }
-                                return { users: [] };
-                            })
-                        );
-                    }
-                    
-                    console.log(`Loading batch ${currentBatch} (pages ${startPage}-${endPage}, batch size: ${batchSize})...`);
-                    
-                    const startTime = Date.now();
-                    const batchResults = await Promise.all(batchPromises);
-                    const endTime = Date.now();
-                    
-                    // Rate Limit Management
-                    if (rateLimitDetected) {
-                        console.log('Rate limit detected, reducing batch size and adding delay...');
-                        batchSize = Math.max(1, Math.floor(batchSize / 2));
-                        await new Promise(resolve => setTimeout(resolve, 2000)); // 2s Pause
-                        rateLimitDetected = false;
-                    } else if (endTime - startTime < 1000 && batchSize < 10) {
-                        // Wenn Batch schnell war, erhöhe Batch-Größe
-                        batchSize = Math.min(10, batchSize + 1);
-                        console.log(`Batch completed quickly, increasing batch size to ${batchSize}`);
-                    }
-                    
-                    // Sammle alle User aus dem Batch
-                    let batchUsers = [];
-                    let emptyPages = 0;
-                    
-                    batchResults.forEach((result, index) => {
-                        const users = result.users || result || [];
-                        if (users.length === 0) {
-                            emptyPages++;
-                        } else {
-                            batchUsers.push(...users);
-                        }
-                    });
-                    
-                    allUsers.push(...batchUsers);
-                    
-                    console.log(`Batch ${currentBatch} complete: ${batchUsers.length} users (total: ${allUsers.length})`);
-                    
-                    // UI Live-Update
-                    document.getElementById('totalStudents').textContent = `${allUsers.length}+`;
-                    
-                    // Stoppe wenn mehr als die Hälfte der Pages leer sind
-                    if (emptyPages >= batchSize / 2 || allUsers.length > 100000) {
-                        console.log(`Stopping: ${emptyPages}/${batchSize} empty pages in batch`);
-                        break;
-                    }
-                    
-                    currentBatch++;
-                    
-                    // Adaptive Pause zwischen Batches
-                    const pauseTime = rateLimitDetected ? 500 : 200;
-                    await new Promise(resolve => setTimeout(resolve, pauseTime));
-                }
-                
-                console.log(`User loading complete: ${allUsers.length} users from ${(currentBatch-1) * batchSize} pages`);
-                
-                // 3. Parallel Enrollment-Loading (kleinere Batches)
-                console.log('Starting parallel enrollment loading...');
-                let allEnrollments = [];
-                let enrollmentBatch = 1;
-                const enrollmentBatchSize = 5; // Kleinere Batches für Enrollments
-                
-                while (enrollmentBatch <= 10) { // Max 50 pages für Enrollments
-                    const batchPromises = [];
-                    const startPage = (enrollmentBatch - 1) * enrollmentBatchSize + 1;
-                    const endPage = startPage + enrollmentBatchSize - 1;
-                    
-                    for (let page = startPage; page <= endPage; page++) {
-                        batchPromises.push(
-                            teachableAPI.getEnrollments(page).catch(error => {
-                                console.warn(`Enrollment page ${page} failed:`, error);
-                                return { enrollments: [] };
-                            })
-                        );
-                    }
-                    
-                    const batchResults = await Promise.all(batchPromises);
-                    
-                    let batchEnrollments = [];
-                    let emptyPages = 0;
-                    
-                    batchResults.forEach((result) => {
-                        const enrollments = result.enrollments || result || [];
-                        if (enrollments.length === 0) {
-                            emptyPages++;
-                        } else {
-                            batchEnrollments.push(...enrollments);
-                        }
-                    });
-                    
-                    allEnrollments.push(...batchEnrollments);
-                    
-                    if (emptyPages >= enrollmentBatchSize / 2) {
-                        break;
-                    }
-                    
-                    enrollmentBatch++;
-                }
-                
-                // 4. Warte auf Kurse (falls noch nicht fertig)
-                const coursesResponse = await coursesPromise;
+                // 1. Load ALL courses
+                addDebugLog('Loading all courses...');
+                const coursesResponse = await teachableAPI.getCourses();
                 const courses = coursesResponse.courses || coursesResponse || [];
+                addDebugLog(`Courses loaded: ${courses.length}`);
                 
-                console.log(`Data loading complete: ${allUsers.length} users, ${allEnrollments.length} enrollments, ${courses.length} courses`);
+                // 2. Load ALL users - no speed optimization, complete data
+                addDebugLog('Loading ALL users (no speed limits)...');
+                let allUsers = [];
+                let userPage = 1;
+                let consecutiveEmptyUserPages = 0;
                 
-                // 4. Detaillierte Metriken berechnen
+                while (consecutiveEmptyUserPages < 5 && userPage <= 10000) {
+                    const usersResponse = await teachableAPI.getUsers(userPage);
+                    const users = usersResponse.users || usersResponse || [];
+                    
+                    if (users.length === 0) {
+                        consecutiveEmptyUserPages++;
+                        addDebugLog(`User page ${userPage}: EMPTY (consecutive empty: ${consecutiveEmptyUserPages})`);
+                    } else {
+                        consecutiveEmptyUserPages = 0;
+                        allUsers.push(...users);
+                        addDebugLog(`User page ${userPage}: ${users.length} users (total: ${allUsers.length})`);
+                        
+                        // Live update
+                        document.getElementById('totalStudents').textContent = allUsers.length.toLocaleString();
+                    }
+                    
+                    userPage++;
+                    
+                    // Small delay to be API-friendly
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+                
+                addDebugLog(`=== USER LOADING COMPLETE: ${allUsers.length} total users ===`);
+                
+                // 3. Try different enrollment endpoints
+                addDebugLog('=== STARTING ENROLLMENT LOADING ===');
+                let allEnrollments = [];
+                
+                // Test different possible enrollment endpoints
+                const enrollmentEndpoints = [
+                    '/enrollments',
+                    '/course_enrollments', 
+                    '/user_enrollments',
+                    '/v1/enrollments'
+                ];
+                
+                for (const endpoint of enrollmentEndpoints) {
+                    try {
+                        addDebugLog(`Testing enrollment endpoint: ${endpoint}`);
+                        const testResponse = await teachableAPI.request(endpoint + '?page=1&per_page=10');
+                        addDebugLog(`SUCCESS with ${endpoint}: ${JSON.stringify(Object.keys(testResponse))}`);
+                        
+                        // If this endpoint works, use it to load all enrollments
+                        let enrollmentPage = 1;
+                        let consecutiveEmptyEnrollmentPages = 0;
+                        
+                        while (consecutiveEmptyEnrollmentPages < 5 && enrollmentPage <= 1000) {
+                            const enrollmentResponse = await teachableAPI.request(`${endpoint}?page=${enrollmentPage}&per_page=100`);
+                            
+                            // Try different possible response structures
+                            let enrollments = [];
+                            if (enrollmentResponse.enrollments) {
+                                enrollments = enrollmentResponse.enrollments;
+                            } else if (enrollmentResponse.course_enrollments) {
+                                enrollments = enrollmentResponse.course_enrollments;
+                            } else if (enrollmentResponse.user_enrollments) {
+                                enrollments = enrollmentResponse.user_enrollments;
+                            } else if (Array.isArray(enrollmentResponse)) {
+                                enrollments = enrollmentResponse;
+                            }
+                            
+                            if (enrollments.length === 0) {
+                                consecutiveEmptyEnrollmentPages++;
+                                addDebugLog(`Enrollment page ${enrollmentPage}: EMPTY (consecutive: ${consecutiveEmptyEnrollmentPages})`);
+                            } else {
+                                consecutiveEmptyEnrollmentPages = 0;
+                                allEnrollments.push(...enrollments);
+                                addDebugLog(`Enrollment page ${enrollmentPage}: ${enrollments.length} enrollments (total: ${allEnrollments.length})`);
+                            }
+                            
+                            enrollmentPage++;
+                            await new Promise(resolve => setTimeout(resolve, 100));
+                        }
+                        
+                        break; // Stop trying other endpoints if one worked
+                        
+                    } catch (error) {
+                        addDebugLog(`FAILED with ${endpoint}: ${error.message}`);
+                    }
+                }
+                
+                addDebugLog(`=== ENROLLMENT LOADING COMPLETE: ${allEnrollments.length} total enrollments ===`);
+                
+                // 4. Analyze data structure
+                addDebugLog('=== ANALYZING DATA STRUCTURES ===');
+                if (allUsers.length > 0) {
+                    addDebugLog(`Sample user object: ${JSON.stringify(allUsers[0], null, 2)}`);
+                }
+                if (allEnrollments.length > 0) {
+                    addDebugLog(`Sample enrollment object: ${JSON.stringify(allEnrollments[0], null, 2)}`);
+                }
+                
+                // 5. Calculate metrics
                 const totalStudents = allUsers.length;
                 const totalEnrollments = allEnrollments.length;
                 
-                // Progress-Berechnungen basierend auf verfügbaren Daten
                 let avgProgress = 0;
                 let completedCount = 0;
                 let activeStudents = 0;
                 
-                console.log('Sample user object:', allUsers[0]);
-                console.log('Sample enrollment object:', allEnrollments[0]);
-                
-                // Analysiere Enrollment-Daten für bessere Metriken
                 if (allEnrollments.length > 0) {
+                    // Calculate from enrollment data
                     const completedEnrollments = allEnrollments.filter(e => 
                         e.percent_complete === 100 || 
+                        e.completed === true ||
                         e.status === 'completed' ||
                         e.completed_at
                     );
                     completedCount = completedEnrollments.length;
                     
                     const totalProgress = allEnrollments.reduce((sum, e) => 
-                        sum + (e.percent_complete || 0), 0
+                        sum + (e.percent_complete || e.progress || 0), 0
                     );
                     avgProgress = Math.round(totalProgress / allEnrollments.length);
                     
-                    // Aktive Studenten (mind. 1% Progress)
                     activeStudents = allEnrollments.filter(e => 
-                        (e.percent_complete || 0) > 1
+                        (e.percent_complete || e.progress || 0) > 1
                     ).length;
+                    
+                    addDebugLog(`Calculated from enrollments: ${completedCount} completed, ${avgProgress}% avg progress`);
                 } else {
-                    // Fallback auf User-Daten
-                    if (allUsers.length > 0) {
-                        avgProgress = 25; // Schätzung
-                        completedCount = Math.round(allUsers.length * 0.15); // 15% Completion Rate Schätzung
-                        activeStudents = Math.round(allUsers.length * 0.6); // 60% Active Rate Schätzung
-                    }
+                    // Fallback calculations
+                    avgProgress = 25;
+                    completedCount = Math.round(totalStudents * 0.15);
+                    activeStudents = Math.round(totalStudents * 0.6);
+                    addDebugLog(`Using fallback calculations (no enrollment data available)`);
                 }
                 
-                // Schauen wir uns die tatsächliche Struktur an
-                const sampleUser = allUsers[0] || {};
-                console.log('Available user fields:', Object.keys(sampleUser));
-                
-                
-                // Schauen wir uns die tatsächliche Struktur an  
-                const sampleEnrollment = allEnrollments[0] || {};
-                console.log('Available user fields:', Object.keys(allUsers[0] || {}));
-                console.log('Available enrollment fields:', Object.keys(sampleEnrollment));
-                
-                // UI Updates
+                // Update UI
                 document.getElementById('totalStudents').textContent = totalStudents.toLocaleString();
                 document.getElementById('totalCourses').textContent = courses.length;
                 document.getElementById('avgProgress').textContent = avgProgress + '%';
                 document.getElementById('completedCourses').textContent = completedCount;
                 
                 document.getElementById('mainContent').innerHTML = `
-                    <h3 style="color: #10b981; margin-bottom: 20px;">✅ Comprehensive Teachable Analytics Loaded</h3>
+                    <h3 style="color: #10b981; margin-bottom: 20px;">✅ Complete Data Analysis Loaded</h3>
                     
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin: 20px 0;">
                         <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center;">
                             <strong>Total Students:</strong><br>
-                            <span style="color: #ff6b35; font-size: 24px; font-weight: bold;">${totalStudents.toLocaleString()}</span>
+                            <span style="color: #dc3545; font-size: 24px; font-weight: bold;">${totalStudents.toLocaleString()}</span>
                         </div>
                         <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center;">
                             <strong>Total Enrollments:</strong><br>
-                            <span style="color: #ff6b35; font-size: 24px; font-weight: bold;">${totalEnrollments.toLocaleString()}</span>
+                            <span style="color: #dc3545; font-size: 24px; font-weight: bold;">${totalEnrollments.toLocaleString()}</span>
                         </div>
                         <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center;">
                             <strong>Active Courses:</strong><br>
-                            <span style="color: #ff6b35; font-size: 24px; font-weight: bold;">${courses.length}</span>
+                            <span style="color: #dc3545; font-size: 24px; font-weight: bold;">${courses.length}</span>
                         </div>
                         <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center;">
                             <strong>Active Students:</strong><br>
-                            <span style="color: #ff6b35; font-size: 24px; font-weight: bold;">${activeStudents.toLocaleString()}</span>
+                            <span style="color: #dc3545; font-size: 24px; font-weight: bold;">${activeStudents.toLocaleString()}</span>
                         </div>
                         <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center;">
                             <strong>Avg. Progress:</strong><br>
-                            <span style="color: #ff6b35; font-size: 24px; font-weight: bold;">${avgProgress}%</span>
+                            <span style="color: #dc3545; font-size: 24px; font-weight: bold;">${avgProgress}%</span>
                         </div>
                         <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center;">
                             <strong>Completions:</strong><br>
-                            <span style="color: #ff6b35; font-size: 24px; font-weight: bold;">${completedCount}</span>
+                            <span style="color: #dc3545; font-size: 24px; font-weight: bold;">${completedCount}</span>
                         </div>
                     </div>
                     
-                    <div style="background: #e8f5e8; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                        <h4 style="color: #2d5a2d; margin-bottom: 10px;">📊 Enhanced Analytics</h4>
+                    <div style="background: ${allEnrollments.length > 0 ? '#e8f5e8' : '#fff3cd'}; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                        <h4 style="color: ${allEnrollments.length > 0 ? '#2d5a2d' : '#856404'}; margin-bottom: 15px;">
+                            ${allEnrollments.length > 0 ? '📊 Complete Analytics' : '⚠️ Limited Analytics'}
+                        </h4>
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
                             <div>
+                                <strong>Data Status:</strong><br>
+                                <span style="font-size: 18px;">${allEnrollments.length > 0 ? 'Complete ✅' : 'Users Only ⚠️'}</span>
+                            </div>
+                            <div>
                                 <strong>Completion Rate:</strong><br>
-                                ${totalEnrollments > 0 ? Math.round((completedCount / totalEnrollments) * 100) : 'N/A'}%
+                                <span style="font-size: 18px;">${totalEnrollments > 0 ? Math.round((completedCount / totalEnrollments) * 100) + '%' : 'Estimated'}</span>
                             </div>
                             <div>
                                 <strong>Avg. Enrollments/Student:</strong><br>
-                                ${totalStudents > 0 ? Math.round(totalEnrollments / totalStudents * 10) / 10 : 'N/A'}
+                                <span style="font-size: 18px;">${totalStudents > 0 ? Math.round(totalEnrollments / totalStudents * 10) / 10 : 'N/A'}</span>
                             </div>
                             <div>
                                 <strong>Engagement Rate:</strong><br>
-                                ${totalStudents > 0 ? Math.round((activeStudents / totalStudents) * 100) : 'N/A'}%
+                                <span style="font-size: 18px;">${totalStudents > 0 ? Math.round((activeStudents / totalStudents) * 100) + '%' : 'N/A'}</span>
                             </div>
                         </div>
                     </div>
                     
                     <p style="color: #6b7280; margin-top: 20px;">
-                        Comprehensive real-time data loaded from your Teachable account via secure WordPress proxy.
+                        Complete data analysis loaded from your Teachable account.
                         <br>Loaded ${totalStudents.toLocaleString()} students and ${totalEnrollments.toLocaleString()} enrollments.
-                        <br>API key was cleared from the form for security.
+                        <br>Check the debug log above for detailed information about the loading process.
                     </p>
-                    
-                    <div class="debug-info">
-                        <strong>                        Technical Details:</strong><br>
-                        API Base URL: https://developers.teachable.com/v1<br>
-                        User batches loaded: ${currentBatch - 1} (${batchSize} parallel requests each)<br>
-                        Enrollment batches loaded: ${enrollmentBatch - 1} (${enrollmentBatchSize} parallel requests each)<br>
-                        Total API calls: ~${(currentBatch - 1) * batchSize + (enrollmentBatch - 1) * enrollmentBatchSize}<br>
-                        Users per page: ~${Math.round(allUsers.length / ((currentBatch - 1) * batchSize))}<br>
-                        Available user fields: ${Object.keys(allUsers[0] || {}).join(', ')}<br>
-                        Available enrollment fields: ${Object.keys(sampleEnrollment).join(', ')}<br>
-                        Data source: Users + Enrollments endpoints for enhanced accuracy
-                    </div>
                 `;
                 
+                addDebugLog('=== DATA LOADING COMPLETE ===');
+                
             } catch (error) {
-                console.error('Failed to load dashboard data:', error);
+                addDebugLog(`ERROR in loadCompleteData: ${error.message}`);
                 showError(`Failed to load data: ${error.message}`);
             }
         }
@@ -660,7 +648,6 @@
             document.getElementById('errorMessage').style.display = 'none';
         }
         
-        // Security: Clear API key from memory when page unloads
         window.addEventListener('beforeunload', function() {
             if (teachableAPI) {
                 teachableAPI.apiKey = null;
