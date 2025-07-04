@@ -402,10 +402,52 @@
                 }
                 
                 console.log('All users loaded:', allUsers.length);
+                console.log('Sample user object:', allUsers[0]);
                 
+                // Verbesserte Metriken basierend auf tatsächlichen Daten
                 const totalStudents = allUsers.length;
-                const avgProgress = Math.round((allUsers.reduce((sum, user) => sum + (user.course_count || 0), 0) / allUsers.length || 0) * 25);
-                const completedCount = allUsers.filter(user => (user.course_count || 0) >= 2).length;
+                
+                // Schauen wir uns die tatsächliche Struktur an
+                const sampleUser = allUsers[0] || {};
+                console.log('Available user fields:', Object.keys(sampleUser));
+                
+                // Verschiedene mögliche Ansätze für Progress-Berechnung
+                let avgProgress = 0;
+                let completedCount = 0;
+                
+                if (allUsers.length > 0) {
+                    // Versuche verschiedene Felder für Progress
+                    if (sampleUser.hasOwnProperty('progress_percentage')) {
+                        avgProgress = Math.round(allUsers.reduce((sum, user) => sum + (user.progress_percentage || 0), 0) / allUsers.length);
+                    } else if (sampleUser.hasOwnProperty('course_enrollments')) {
+                        const enrollments = allUsers.reduce((sum, user) => sum + (user.course_enrollments?.length || 0), 0);
+                        avgProgress = Math.round((enrollments / allUsers.length / courses.length) * 100);
+                        completedCount = allUsers.filter(user => user.course_enrollments?.some(e => e.completed)).length;
+                    } else if (sampleUser.hasOwnProperty('completed_courses_count')) {
+                        completedCount = allUsers.reduce((sum, user) => sum + (user.completed_courses_count || 0), 0);
+                        avgProgress = Math.round((completedCount / (allUsers.length * courses.length)) * 100);
+                    } else {
+                        // Fallback: einfache Schätzung basierend auf Anmeldedatum
+                        const now = new Date();
+                        avgProgress = Math.round(allUsers.reduce((sum, user) => {
+                            if (user.created_at) {
+                                const created = new Date(user.created_at);
+                                const daysSinceEnrollment = (now - created) / (1000 * 60 * 60 * 24);
+                                return sum + Math.min(daysSinceEnrollment * 2, 100); // 2% pro Tag, max 100%
+                            }
+                            return sum + 25; // Default fallback
+                        }, 0) / allUsers.length);
+                        
+                        completedCount = allUsers.filter(user => {
+                            if (user.created_at) {
+                                const created = new Date(user.created_at);
+                                const daysSinceEnrollment = (now - created) / (1000 * 60 * 60 * 24);
+                                return daysSinceEnrollment > 30; // Nach 30 Tagen als "completed" betrachten
+                            }
+                            return false;
+                        }).length;
+                    }
+                }
                 
                 document.getElementById('totalStudents').textContent = totalStudents;
                 document.getElementById('totalCourses').textContent = courses.length;
@@ -437,7 +479,12 @@
                         API Base URL: https://developers.teachable.com/v1<br>
                         Proxy URL: ${teachableAPI.proxyURL}<br>
                         Courses endpoint: /courses<br>
-                        Users endpoint: /users
+                        Users endpoint: /users<br>
+                        Available user fields: ${allUsers.length > 0 ? Object.keys(allUsers[0]).join(', ') : 'No users found'}<br>
+                        Progress calculation method: ${allUsers.length > 0 && allUsers[0].hasOwnProperty('progress_percentage') ? 'Using progress_percentage' : 
+                                                     allUsers.length > 0 && allUsers[0].hasOwnProperty('course_enrollments') ? 'Using course_enrollments' :
+                                                     allUsers.length > 0 && allUsers[0].hasOwnProperty('completed_courses_count') ? 'Using completed_courses_count' :
+                                                     'Using time-based estimation'}
                     </div>
                 `;
                 
