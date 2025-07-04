@@ -403,7 +403,7 @@
                 let allUsers = [];
                 let page = 1;
                 let consecutiveEmptyPages = 0;
-                const maxPages = 1000; // Höheres Limit für große Schulen
+                const maxPages = 5000; // Für 100k+ Studenten bei ~20 pro Seite
                 
                 while (page <= maxPages && consecutiveEmptyPages < 3) {
                     try {
@@ -446,7 +446,7 @@
                 let enrollmentPage = 1;
                 let enrollmentEmptyPages = 0;
                 
-                while (enrollmentPage <= 50 && enrollmentEmptyPages < 3) {
+                while (enrollmentPage <= 250 && enrollmentEmptyPages < 3) {
                     try {
                         const enrollmentsResponse = await teachableAPI.getEnrollments(enrollmentPage);
                         const enrollments = enrollmentsResponse.enrollments || enrollmentsResponse || [];
@@ -513,10 +513,9 @@
                 console.log('Available user fields:', Object.keys(sampleUser));
                 
                 
-                // Schauen wir uns die tatsächliche Struktur an
-                const sampleUser = allUsers[0] || {};
+                // Schauen wir uns die tatsächliche Struktur an  
                 const sampleEnrollment = allEnrollments[0] || {};
-                console.log('Available user fields:', Object.keys(sampleUser));
+                console.log('Available user fields:', Object.keys(allUsers[0] || {}));
                 console.log('Available enrollment fields:', Object.keys(sampleEnrollment));
                 
                 // UI Updates
@@ -585,7 +584,7 @@
                         User pages loaded: ${page - 1}<br>
                         Enrollment pages loaded: ${enrollmentPage - 1}<br>
                         Users per page: ~${Math.round(totalStudents / (page - 1))}<br>
-                        Available user fields: ${Object.keys(sampleUser).join(', ')}<br>
+                        Available user fields: ${Object.keys(allUsers[0] || {}).join(', ')}<br>
                         Available enrollment fields: ${Object.keys(sampleEnrollment).join(', ')}<br>
                         Data source: Users + Enrollments endpoints for enhanced accuracy
                     </div>
