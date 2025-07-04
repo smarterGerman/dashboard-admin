@@ -158,6 +158,16 @@
             color: #6b7280;
         }
         
+        .debug-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-family: monospace;
+            font-size: 12px;
+            color: #666;
+        }
+        
         @media (max-width: 768px) {
             .api-form {
                 flex-direction: column;
@@ -208,7 +218,8 @@
                 </div>
             </div>
             <div class="success-info">
-                <strong>🔒 Secure:</strong> API key sent to your WordPress proxy, never stored on GitHub Pages
+                <strong>🔒 Secure:</strong> API key sent to your WordPress proxy, never stored on GitHub Pages<br>
+                <strong>✅ Fixed:</strong> Corrected API base URL to developers.teachable.com
             </div>
         </div>
         
@@ -244,7 +255,8 @@
         class TeachableAPI {
             constructor(apiKey, schoolDomain, proxyURL) {
                 this.apiKey = apiKey;
-                this.baseURL = 'https://api.teachable.com/v1';
+                // KORRIGIERTE BASE URL - das war das Hauptproblem!
+                this.baseURL = 'https://developers.teachable.com/v1';
                 this.schoolDomain = schoolDomain;
                 this.proxyURL = proxyURL;
             }
@@ -260,6 +272,9 @@
                     requestData.data = data;
                 }
                 
+                console.log('Sending request to proxy:', this.proxyURL);
+                console.log('Request data:', { ...requestData, apiKey: '[HIDDEN]' });
+                
                 try {
                     const response = await fetch(this.proxyURL, {
                         method: 'POST',
@@ -272,13 +287,17 @@
                     console.log('Proxy Response Status:', response.status);
                     
                     if (!response.ok) {
+                        const errorText = await response.text();
+                        console.log('Error response:', errorText);
+                        
                         if (response.status === 401) {
                             throw new Error('Invalid API key or unauthorized access');
                         } else if (response.status === 403) {
-                            throw new Error('API access forbidden - check your plan level');
+                            throw new Error('API access forbidden - check your Teachable plan (Pro+ required)');
+                        } else if (response.status === 404) {
+                            throw new Error('API endpoint not found - check your API configuration');
                         } else {
-                            const errorText = await response.text();
-                            throw new Error(`Proxy Error: ${response.status} - ${errorText}`);
+                            throw new Error(`Proxy Error: ${response.status} - ${errorText.substring(0, 200)}`);
                         }
                     }
                     
@@ -302,9 +321,12 @@
             
             async testConnection() {
                 try {
+                    console.log('Testing connection...');
                     const courses = await this.getCourses();
+                    console.log('Test connection result:', courses);
                     return courses && (courses.courses || courses);
                 } catch (error) {
+                    console.error('Connection test failed:', error);
                     return false;
                 }
             }
@@ -353,15 +375,22 @@
         
         async function loadDashboardData() {
             try {
+                console.log('Loading dashboard data...');
+                
                 const coursesResponse = await teachableAPI.getCourses();
+                console.log('Courses response:', coursesResponse);
+                
                 const courses = coursesResponse.courses || coursesResponse || [];
                 
                 let allUsers = [];
                 let page = 1;
                 let hasMore = true;
                 
+                console.log('Loading users...');
                 while (hasMore && page <= 5) {
                     const usersResponse = await teachableAPI.getUsers(page);
+                    console.log(`Users page ${page}:`, usersResponse);
+                    
                     const users = usersResponse.users || usersResponse || [];
                     
                     if (users.length === 0) {
@@ -371,6 +400,8 @@
                         page++;
                     }
                 }
+                
+                console.log('All users loaded:', allUsers.length);
                 
                 const totalStudents = allUsers.length;
                 const avgProgress = Math.round((allUsers.reduce((sum, user) => sum + (user.course_count || 0), 0) / allUsers.length || 0) * 25);
@@ -382,7 +413,7 @@
                 document.getElementById('completedCourses').textContent = completedCount;
                 
                 document.getElementById('mainContent').innerHTML = `
-                    <h3 style="color: #10b981; margin-bottom: 20px;">✓ Successfully Connected to Teachable API</h3>
+                    <h3 style="color: #10b981; margin-bottom: 20px;">✅ Successfully Connected to Teachable API</h3>
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin: 20px 0;">
                         <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
                             <strong>Students Loaded:</strong><br>
@@ -394,16 +425,24 @@
                         </div>
                         <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
                             <strong>API Status:</strong><br>
-                            <span style="color: #10b981;">✓ Working</span>
+                            <span style="color: #10b981;">✅ Working</span>
                         </div>
                     </div>
                     <p style="color: #6b7280; margin-top: 20px;">
                         Real-time data loaded from your Teachable account via secure WordPress proxy.
                         <br>API key was cleared from the form for security.
                     </p>
+                    <div class="debug-info">
+                        <strong>Debug Info:</strong><br>
+                        API Base URL: https://developers.teachable.com/v1<br>
+                        Proxy URL: ${teachableAPI.proxyURL}<br>
+                        Courses endpoint: /courses<br>
+                        Users endpoint: /users
+                    </div>
                 `;
                 
             } catch (error) {
+                console.error('Failed to load dashboard data:', error);
                 showError(`Failed to load data: ${error.message}`);
             }
         }
