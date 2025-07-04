@@ -382,30 +382,61 @@
                 
                 const courses = coursesResponse.courses || coursesResponse || [];
                 
-                let allUsers = [];
-                let page = 1;
-                let hasMore = true;
+                // Erstmal nur eine Seite laden und Meta-Info analysieren
+                console.log('Loading users (analyzing pagination)...');
+                const firstUsersResponse = await teachableAPI.getUsers(1);
+                console.log('First users response:', firstUsersResponse);
+                console.log('Meta information:', firstUsersResponse.meta);
                 
-                console.log('Loading users...');
-                while (hasMore && page <= 5) {
-                    const usersResponse = await teachableAPI.getUsers(page);
-                    console.log(`Users page ${page}:`, usersResponse);
-                    
-                    const users = usersResponse.users || usersResponse || [];
-                    
-                    if (users.length === 0) {
-                        hasMore = false;
-                    } else {
+                let allUsers = [];
+                let totalPages = 1;
+                let totalCount = 0;
+                
+                // Meta-Daten analysieren
+                if (firstUsersResponse.meta) {
+                    totalPages = firstUsersResponse.meta.total_pages || 1;
+                    totalCount = firstUsersResponse.meta.total_count || firstUsersResponse.users?.length || 0;
+                    console.log(`Total pages: ${totalPages}, Total count: ${totalCount}`);
+                }
+                
+                // Ersten Batch hinzufügen
+                const firstUsers = firstUsersResponse.users || firstUsersResponse || [];
+                allUsers.push(...firstUsers);
+                
+                // Entscheidung: Bei vielen Nutzern nur Sample laden
+                const maxPagesToLoad = totalCount > 1000 ? 10 : Math.min(totalPages, 50);
+                console.log(`Loading ${maxPagesToLoad} pages (of ${totalPages} total)...`);
+                
+                // Weitere Seiten laden
+                for (let page = 2; page <= maxPagesToLoad; page++) {
+                    try {
+                        const usersResponse = await teachableAPI.getUsers(page);
+                        const users = usersResponse.users || usersResponse || [];
+                        
+                        if (users.length === 0) {
+                            console.log(`No more users found at page ${page}`);
+                            break;
+                        }
+                        
                         allUsers.push(...users);
-                        page++;
+                        console.log(`Loaded page ${page}: ${users.length} users (total so far: ${allUsers.length})`);
+                        
+                        // Kurze Pause zwischen Requests um Rate Limits zu vermeiden
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        
+                    } catch (error) {
+                        console.error(`Error loading page ${page}:`, error);
+                        break;
                     }
                 }
                 
                 console.log('All users loaded:', allUsers.length);
                 console.log('Sample user object:', allUsers[0]);
                 
-                // Verbesserte Metriken basierend auf tatsächlichen Daten
-                const totalStudents = allUsers.length;
+                // Verwende Meta-Daten für echte Zahlen wenn verfügbar
+                const totalStudents = totalCount > 0 ? totalCount : allUsers.length;
+                const loadedStudents = allUsers.length;
+                const isPartialLoad = totalStudents > loadedStudents;
                 
                 // Schauen wir uns die tatsächliche Struktur an
                 const sampleUser = allUsers[0] || {};
@@ -449,7 +480,7 @@
                     }
                 }
                 
-                document.getElementById('totalStudents').textContent = totalStudents;
+                document.getElementById('totalStudents').textContent = totalStudents.toLocaleString();
                 document.getElementById('totalCourses').textContent = courses.length;
                 document.getElementById('avgProgress').textContent = avgProgress + '%';
                 document.getElementById('completedCourses').textContent = completedCount;
@@ -458,8 +489,9 @@
                     <h3 style="color: #10b981; margin-bottom: 20px;">✅ Successfully Connected to Teachable API</h3>
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin: 20px 0;">
                         <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
-                            <strong>Students Loaded:</strong><br>
-                            <span style="color: #ff6b35; font-size: 20px;">${totalStudents}</span>
+                            <strong>Total Students:</strong><br>
+                            <span style="color: #ff6b35; font-size: 20px;">${totalStudents.toLocaleString()}</span>
+                            ${isPartialLoad ? `<br><small style="color: #666;">Sample loaded: ${loadedStudents}</small>` : ''}
                         </div>
                         <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
                             <strong>Courses Found:</strong><br>
@@ -469,17 +501,23 @@
                             <strong>API Status:</strong><br>
                             <span style="color: #10b981;">✅ Working</span>
                         </div>
+                        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
+                            <strong>Data Load:</strong><br>
+                            <span style="color: #ff6b35;">${isPartialLoad ? 'Sample' : 'Complete'}</span>
+                        </div>
                     </div>
                     <p style="color: #6b7280; margin-top: 20px;">
                         Real-time data loaded from your Teachable account via secure WordPress proxy.
+                        ${isPartialLoad ? `<br><strong>Note:</strong> Loaded ${loadedStudents} students as sample from ${totalStudents.toLocaleString()} total (performance optimization).` : ''}
                         <br>API key was cleared from the form for security.
                     </p>
                     <div class="debug-info">
                         <strong>Debug Info:</strong><br>
                         API Base URL: https://developers.teachable.com/v1<br>
                         Proxy URL: ${teachableAPI.proxyURL}<br>
-                        Courses endpoint: /courses<br>
-                        Users endpoint: /users<br>
+                        Total pages available: ${totalPages}<br>
+                        Pages loaded: ${maxPagesToLoad}<br>
+                        Students per page: ~${Math.round(loadedStudents / maxPagesToLoad)}<br>
                         Available user fields: ${allUsers.length > 0 ? Object.keys(allUsers[0]).join(', ') : 'No users found'}<br>
                         Progress calculation method: ${allUsers.length > 0 && allUsers[0].hasOwnProperty('progress_percentage') ? 'Using progress_percentage' : 
                                                      allUsers.length > 0 && allUsers[0].hasOwnProperty('course_enrollments') ? 'Using course_enrollments' :
